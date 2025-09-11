@@ -12,7 +12,7 @@ As part of `Deliverable ⓵ Development deployment: JWT Pizza`, start up the app
 | Order pizza                                         | menu.tsx, payment.tsx | [POST] /api/order/menu | `SELECT userId FROM auth WHERE token=?`<br/>`INSERT INTO dinerOrder (dinerId, franchiseId, storeId, date) VALUES (?, ?, ?, now())`<br/>`INSERT INTO orderItem (orderId, menuId, description, price) VALUES (?, ?, ?, ?)` |
 | Verify pizza                                        | delivery.tsx	     | none              | none         |
 | View profile page                                   | dinerDashboard.tsx | [GET] /api/user/me| `SELECT userId FROM auth WHERE token=?` |
-| View franchise<br/>(as diner)                       | franchiseDashboard.tsx | [GET] /api/franchise?page=0&limit=10&name=* | `SELECT id, name FROM store WHERE franchiseId=?` |
+| View franchise<br/>(as diner)                       | franchiseDashboard.tsx |  [GET] /api/franchise/:userId | `SELECT id, name FROM store WHERE franchiseId=?` |
 | Logout                                              | logout.tsx         | [DELETE] /api/auth| `SELECT userId FROM auth WHERE token=?`</br>`DELETE FROM auth WHERE token=?` |
 | View About page                                     | about.tsx          | none              | none         |
 | View History page                                   | history.tsx	       | none              | none         |
