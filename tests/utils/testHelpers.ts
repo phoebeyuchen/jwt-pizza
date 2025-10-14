@@ -109,19 +109,29 @@ export async function basicInit(page: Page) {
       const updateRes = { user: loggedInUser, token: "updatedtoken" };
       await route.fulfill({ json: updateRes });
     } else if (method === "DELETE") {
-      if (userId) {
-        const userToDelete = Object.values(validUsers).find(u => u.id === userId);
-        if (userToDelete && userToDelete.email) {
-          delete validUsers[userToDelete.email];
-        }
+      if (!loggedInUser || !loggedInUser.roles?.some(r => r.role === Role.Admin)) {
+        await route.fulfill({ status: 403, json: { error: "Forbidden" } });
+        return;
+      }
+
+      const userToDelete = Object.values(validUsers).find(u => u.id === userId);
+      if (userToDelete && userToDelete.email) {
+        delete validUsers[userToDelete.email];
         await route.fulfill({ json: { message: "user deleted" } });
+      } else {
+        await route.fulfill({ status: 404, json: { error: "User not found" } });
       }
     }
   });
 
-  // GET /api/user - List all users (MUST come after /api/user/me and /api/user/:userId)
-  await page.route("*/**/api/user", async (route) => {
+  // GET /api/user - List all users (with or without query params)
+  await page.route("*/**/api/user*", async (route) => {
     const method = route.request().method();
+    const url = route.request().url();
+
+    if (url.includes('/api/user/me') || url.match(/\/api\/user\/\d+$/)) {
+      return;
+    }
 
     if (method === "GET") {
       // Check if user is logged in and is admin
@@ -136,16 +146,32 @@ export async function basicInit(page: Page) {
         return;
       }
 
-      const userListRes = {
-        users: Object.values(validUsers).map(u => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          roles: u.roles
-        })),
-        more: false
-      };
-      await route.fulfill({ json: userListRes });
+      const urlObj = new URL(url);
+      const pageNum = parseInt(urlObj.searchParams.get('page') || '0');
+      const limit = parseInt(urlObj.searchParams.get('limit') || '10');
+      const nameFilter = urlObj.searchParams.get('name') || '';
+
+      let filteredUsers = Object.values(validUsers);
+      if (nameFilter && nameFilter !== '*') {
+        const filter = nameFilter.replace(/\*/g, '');
+        filteredUsers = filteredUsers.filter(u =>
+          u.name?.toLowerCase().includes(filter.toLowerCase())
+        );
+      }
+
+      const start = pageNum * limit;
+      const end = start + limit;
+      const paginatedUsers = filteredUsers.slice(start, end);
+      const more = end < filteredUsers.length;
+
+      const users = paginatedUsers.map(u => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        roles: u.roles,
+      }));
+
+      await route.fulfill({ json: { users, more } });
     }
   });
 
