@@ -12,10 +12,10 @@ test("admin login and navigate to dashboard", async ({ page }) => {
   await page.getByRole("textbox", { name: "Email address" }).fill("admin@jwt.com");
   await page.getByRole("textbox", { name: "Password" }).fill("a");
   await page.getByRole("button", { name: "Login" }).click();
-  
+
   await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
   await page.getByRole("link", { name: "Admin" }).click();
-  
+
   await expect(page.getByText("Mama Ricci's kitchen")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Franchises" })).toBeVisible();
 });
@@ -32,10 +32,10 @@ test("admin dashboard and close franchise", async ({ page }) => {
   await expect(page.getByRole("cell", { name: "LotaPizza" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "PizzaCorp" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "topSpot" })).toBeVisible();
-  
+
   await page.getByRole("row", { name: "topSpot Close" }).getByRole("button").click();
   await page.getByRole("button", { name: "Close" }).click();
-  
+
   await expect(page.getByText("Mama Ricci's kitchen")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Franchises" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "LotaPizza" })).toBeVisible();

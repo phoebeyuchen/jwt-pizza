@@ -40,7 +40,7 @@ export async function basicInit(page: Page) {
         await route.fulfill({ status: 401, json: { error: "Unauthorized" } });
         return;
       }
-      loggedInUser = validUsers[loginReq.email];
+      loggedInUser = user;
       const loginRes = { user: loggedInUser, token: "abcdef" };
       await route.fulfill({ json: loginRes });
     } else if (method === "DELETE") {
@@ -57,13 +57,15 @@ export async function basicInit(page: Page) {
         });
         return;
       }
-      const user = {
-        id: "6",
+      const user: User = {
+        id: Math.floor(Math.random() * 10000).toString(),
         name: registerReq.name,
         email: registerReq.email,
         password: registerReq.password,
         roles: [{ role: Role.Diner }],
       };
+      validUsers[user.email!] = user;
+      loggedInUser = user;
       const registerRes = { user, token: "ghijkl" };
       await route.fulfill({ json: registerRes });
     }
@@ -73,6 +75,36 @@ export async function basicInit(page: Page) {
   await page.route("*/**/api/user/me", async (route) => {
     expect(route.request().method()).toBe("GET");
     await route.fulfill({ json: loggedInUser });
+  });
+
+  // Handle user update
+  await page.route(/\/api\/user\/\d+$/, async (route) => {
+    const method = route.request().method();
+    if (method === "PUT") {
+      const updateReq = route.request().postDataJSON();
+      // Update the logged in user with the new data
+      if (loggedInUser) {
+        const oldEmail = loggedInUser.email;
+        
+        loggedInUser = {
+          ...loggedInUser,
+          name: updateReq.name || loggedInUser.name,
+          email: updateReq.email || loggedInUser.email,
+          password: updateReq.password || loggedInUser.password,
+        };
+        
+        if (oldEmail && validUsers[oldEmail]) {
+          if (updateReq.email && updateReq.email !== oldEmail) {
+            delete validUsers[oldEmail];
+            validUsers[updateReq.email] = loggedInUser;
+          } else {
+            validUsers[oldEmail] = loggedInUser;
+          }
+        }
+      }
+      const updateRes = { user: loggedInUser, token: "updatedtoken" };
+      await route.fulfill({ json: updateRes });
+    }
   });
 
   // A standard menu
