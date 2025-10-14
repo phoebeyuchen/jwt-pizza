@@ -40,7 +40,7 @@ export async function basicInit(page: Page) {
         await route.fulfill({ status: 401, json: { error: "Unauthorized" } });
         return;
       }
-      loggedInUser = user;
+      loggedInUser = validUsers[loginReq.email];
       const loginRes = { user: loggedInUser, token: "abcdef" };
       await route.fulfill({ json: loginRes });
     } else if (method === "DELETE") {
@@ -71,28 +71,32 @@ export async function basicInit(page: Page) {
     }
   });
 
-  // Return the currently logged in user
+  // GET /api/user/me - Get current user
   await page.route("*/**/api/user/me", async (route) => {
     expect(route.request().method()).toBe("GET");
     await route.fulfill({ json: loggedInUser });
   });
 
-  // Handle user update
+  // PUT /api/user/:userId - Update user
+  // DELETE /api/user/:userId - Delete user
   await page.route(/\/api\/user\/\d+$/, async (route) => {
     const method = route.request().method();
+    const url = route.request().url();
+    const userId = url.match(/\/api\/user\/(\d+)/)?.[1];
+
     if (method === "PUT") {
       const updateReq = route.request().postDataJSON();
       // Update the logged in user with the new data
       if (loggedInUser) {
         const oldEmail = loggedInUser.email;
-        
+
         loggedInUser = {
           ...loggedInUser,
           name: updateReq.name || loggedInUser.name,
           email: updateReq.email || loggedInUser.email,
           password: updateReq.password || loggedInUser.password,
         };
-        
+
         if (oldEmail && validUsers[oldEmail]) {
           if (updateReq.email && updateReq.email !== oldEmail) {
             delete validUsers[oldEmail];
@@ -104,6 +108,44 @@ export async function basicInit(page: Page) {
       }
       const updateRes = { user: loggedInUser, token: "updatedtoken" };
       await route.fulfill({ json: updateRes });
+    } else if (method === "DELETE") {
+      if (userId) {
+        const userToDelete = Object.values(validUsers).find(u => u.id === userId);
+        if (userToDelete && userToDelete.email) {
+          delete validUsers[userToDelete.email];
+        }
+        await route.fulfill({ json: { message: "user deleted" } });
+      }
+    }
+  });
+
+  // GET /api/user - List all users (MUST come after /api/user/me and /api/user/:userId)
+  await page.route("*/**/api/user", async (route) => {
+    const method = route.request().method();
+
+    if (method === "GET") {
+      // Check if user is logged in and is admin
+      if (!loggedInUser) {
+        await route.fulfill({ status: 401, json: { message: "unauthorized" } });
+        return;
+      }
+
+      const isAdmin = loggedInUser.roles?.some(r => r.role === Role.Admin);
+      if (!isAdmin) {
+        await route.fulfill({ status: 403, json: { message: "unauthorized" } });
+        return;
+      }
+
+      const userListRes = {
+        users: Object.values(validUsers).map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          roles: u.roles
+        })),
+        more: false
+      };
+      await route.fulfill({ json: userListRes });
     }
   });
 
